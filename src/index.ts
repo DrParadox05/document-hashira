@@ -1,5 +1,50 @@
 import { createHash } from 'crypto';
 import { createReadStream } from 'fs';
+import { ethers } from 'ethers';
+
+const RPC_URL = process.env.RPC_URL;
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+const contractAddress = '0xd9145CCE52D386f254917e481eB44e9943F39138';
+const contractABI = [
+  {
+    "inputs": [
+        {
+            "internalType": "string",
+            "name": "orgId",
+            "type": "string"
+        }
+    ],
+    "name": "getMerkleRoot",
+    "outputs": [
+        {
+            "internalType": "bytes32",
+            "name": "merkleRoot",
+            "type": "bytes32"
+        }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+        {
+            "internalType": "string",
+            "name": "orgId",
+            "type": "string"
+        },
+        {
+            "internalType": "bytes32",
+            "name": "merkleRoot",
+            "type": "bytes32"
+        }
+    ],
+    "name": "storeMerkleRoot",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+];
 
 type DocumentHashRecord = {
   orgId: string;
@@ -45,17 +90,33 @@ const createMerkleRoot = (hashes: string[]): string => {
   return createMerkleRoot(newLevel);
 };
 
-// const filePath = 'files/bigFile.txt';
-// console.log(filePath);
+if (!PRIVATE_KEY) {
+  throw new Error("PRIVATE_KEY is not set in the environment variables.");
+}
 
-// hashFile(filePath)
-//   .then((hash) => {
-//     console.log(`SHA-256 hash of the file is: ${hash}`);
-//   })
-//   .catch((err) => {
-//     console.error('Error hashing file:', err);
-//   });
+const provider = new ethers.JsonRpcProvider(RPC_URL, chainId);
+const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+const contract = new ethers.Contract(contractAddress, contractABI, wallet);
 
+async function storeMerkleRoot(orgId: string, merkleRoot: string) {
+    try {
+        const tx = await contract.storeMerkleRoot(orgId, merkleRoot);
+        await tx.wait(); // Wait for the transaction to be mined
+        console.log(`Merkle root stored successfully with document ID: ${orgId}`);
+    } catch (error) {
+        console.error('Error storing Merkle root:', error);
+    }
+}
+
+async function getMerkleRoot(orgId: string) {
+    try {
+        const merkleRoot = await contract.getMerkleRoot(orgId);
+        console.log(`Merkle root for document ID ${orgId}: ${merkleRoot}`);
+        return merkleRoot;
+    } catch (error) {
+        console.error('Error retrieving Merkle root:', error);
+    }
+}
 
 const main = async () => {
   const filePaths = ['files/bigFile1.txt', 'files/example.txt', 'files/bigFile1.txt']; 
